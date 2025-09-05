@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sistema de Registro de Defectos de Calidad</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- SheetJS para importar/exportar Excel opcional -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    .transition-all { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+    .status-pending { background-color: #ede9fe; color: #7c3aed; }
+    .status-approved { background-color: #e0e7ff; color: #4338ca; }
+    .status-rejected { background-color: #f3e8ff; color: #a855f7; }
+    .status-invalid { background-color: #f5f3ff; color: #6d28d9; }
+  </style>
+</head>
+<body class="bg-purple-50 min-h-screen">
+  <!-- Header -->
+  <header class="bg-purple-800 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-4">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+          <img src="iws.jpg" alt="Logo IWS" class="h-10">
+          <h1 class="text-2xl font-bold">Sistema de Control de Calidad</h1>
+        </div>
+        <button id="loginBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-all">
+          <i class="fas fa-user mr-2"></i>Ingresar como Administrador
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container mx-auto px-4 py-8">
+    <!-- Sección Principal - Formulario de Registro -->
+    <section id="mainSection" class="mb-12">
+      <div class="text-center mb-8">
+        <h2 class="text-3xl font-bold text-gray-800 mb-4">Registro de Defectos de Calidad</h2>
+        <p class="text-gray-600 max-w-2xl mx-auto">
+          Complete el formulario para reportar defectos. El sistema consultará el <b>catálogo por código</b> y completará
+          <b>Material</b> y <b>Proveedor</b> automáticamente.
+        </p>
+      </div>
+
+      <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+        <div class="p-6 bg-purple-700 text-white flex items-center justify-between gap-3 flex-wrap">
+          <h3 class="text-xl font-semibold"><i class="fas fa-plus-circle mr-2"></i>Nuevo Reporte de Defecto</h3>
+          <div class="flex items-center gap-2 text-sm">
+            <span class="opacity-80">Catálogo cargado:</span>
+            <span id="catalogCount" class="px-2 py-1 rounded bg-purple-900">0</span>
+          </div>
+          <!-- Importar catálogo opcional -->
+          <label class="bg-purple-900 hover:bg-purple-800 px-4 py-2 rounded-lg cursor-pointer text-sm">
+            <i class="fa-solid fa-database mr-2"></i>Importar Catálogo
+            <input id="catalogFile" type="file" accept=".csv,.xlsx,.xls" class="hidden" />
+          </label>
+        </div>
+
+        <form id="defectForm" class="p-6 space-y-6">
+          <!-- 1) Fecha y Sector (se mantienen) -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Fecha del Hallazgo</label>
+              <input type="date" id="fecha" required
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Sector/Área</label>
+              <select id="sector" required
+                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                <option value="">Seleccionar sector</option>
+                <option value="KDF 2">KDF 2</option>
+                <option value="KDF 3">KDF 3</option>
+                <option value="KDF 4">KDF 4</option>
+                <option value="KDF 5">KDF 5</option>
+                <option value="M15">M15</option>
+                <option value="M16">M16</option>
+                <option value="M17">M17</option>
+                <option value="M18">M18</option>
+                <option value="M28">M28</option>
+                <option value="M29">M29</option>
+                <option value="M59">M59</option>
+                <option value="M39">M39</option>
+                <option value="LOGISTICA">LOGISTICA</option>
+                <option value="PMD">PMD</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 2) Código (input) + Material/Proveedor (auto) -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Código del Material</label>
+              <input type="text" id="codigoMaterial" required placeholder="Ej: 0012345"
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+              <p id="codigoHelp" class="mt-1 text-xs text-gray-500">Se autocompleta Material y Proveedor al salir del campo.</p>
+              <p id="codigoError" class="mt-1 text-xs text-red-600 hidden">Código no encontrado en el catálogo.</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Material (auto)</label>
+              <input type="text" id="materialAuto" readonly placeholder="—"
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Proveedor (auto)</label>
+              <input type="text" id="proveedorAuto" readonly placeholder="—"
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+            </div>
+          </div>
+
+          <!-- 3) Lote -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Lote</label>
+            <input type="text" id="lote" required placeholder="Ej: L-2025-08-15-01"
+                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+          </div>
+
+          <!-- 4) Tipo de defecto y descripción -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de Defecto</label>
+              <select id="defecto" required
+                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                <option value="">Seleccionar tipo de defecto</option>
+                <option value="ARQUEADAS">ARQUEADAS</option>
+                <option value="FUERA DE REGISTRO">FUERA DE REGISTRO</option>
+                <option value="MACULA">MACULA</option>
+                <option value="GOLPEADA">GOLPEADA</option>
+                <option value="BOBINADO FLOJO">BOBINADO FLOJO</option>
+                <option value="BUJE DESALINEADO">BUJE DESALINEADO</option>
+                <option value="BUJE SUELTO">BUJE SUELTO</option>
+                <option value="CURLING">CURLING</option>
+                <option value="DEFECTO DE IMPRESION">DEFECTO DE IMPRESION</option>
+                <option value="DESLIZAMIENTO">DESLIZAMIENTO</option>
+                <option value="FAJADO FLOJO">FAJADO FLOJO</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Descripción del Defecto</label>
+              <textarea id="descripcion" required rows="4" placeholder="Describa en detalle el defecto encontrado..."
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"></textarea>
+            </div>
+          </div>
+
+          <div class="flex justify-end">
+            <button type="submit"
+                    class="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-semibold transition-all flex items-center">
+              <i class="fas fa-paper-plane mr-2"></i>Enviar Reporte
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Sección de Mis Reportes -->
+    <section id="myReportsSection" class="mb-12" style="display: none;">
+      <div class="text-center mb-8">
+        <h2 class="text-3xl font-bold text-gray-800 mb-4">Mis Reportes de Defectos</h2>
+        <p class="text-gray-600">Historial de todos los defectos que ha reportado y su estado actual.</p>
+      </div>
+      <div id="reportsList" class="grid grid-cols-1 gap-6"></div>
+    </section>
+
+    <!-- Panel de Administración (igual que antes, omitido por brevedad) -->
+    <section id="adminSection" class="mb-12" style="display: none;">
+      <div class="text-center mb-8">
+        <h2 class="text-3xl font-bold text-gray-800 mb-2">Panel de Administración</h2>
+        <p class="text-gray-600">Gestión de todos los reportes de defectos del sistema.</p>
+        <p class="mt-2 text-sm">Pendientes: <span id="badgePendientes" class="font-semibold text-purple-700">0</span></p>
+      </div>
+      <div class="bg-white rounded-xl shadow-md p-4 mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <input id="adminSearch" type="text" placeholder="Buscar por código, material, descripción, lote o ID..."
+               class="px-3 py-2 border rounded-lg w-full focus:ring-2 focus:ring-purple-500">
+        <select id="adminFilterEstado" class="px-3 py-2 border rounded-lg w-full focus:ring-2 focus:ring-purple-500">
+          <option value="">Estado: Todos</option>
+          <option value="en análisis">En análisis</option>
+          <option value="reclamos">Reclamos</option>
+          <option value="rechazo">Rechazo</option>
+          <option value="no válido">No válido</option>
+        </select>
+        <select id="adminFilterProveedor" class="px-3 py-2 border rounded-lg w-full focus:ring-2 focus:ring-purple-500">
+          <option value="">Proveedor: Todos</option>
+          <option>AMCOR</option><option>CERDIA</option><option>INNOVIA</option><option>IPC</option>
+        </select>
+        <select id="adminFilterSector" class="px-3 py-2 border rounded-lg w-full focus:ring-2 focus:ring-purple-500">
+          <option value="">Sector: Todos</option>
+          <option>KDF 2</option><option>KDF 3</option><option>KDF 4</option><option>KDF 5</option>
+          <option>M15</option><option>M16</option><option>M17</option><option>M18</option>
+          <option>M28</option><option>M29</option><option>M59</option><option>M39</option>
+          <option>LOGISTICA</option><option>PMD</option>
+        </select>
+        <div class="md:col-span-4 flex gap-2 flex-wrap">
+          <select id="adminSort" class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+            <option value="fechaDesc">Orden: Fecha ↓</option>
+            <option value="fechaAsc">Orden: Fecha ↑</option>
+            <option value="idDesc">Orden: ID ↓</option>
+            <option value="idAsc">Orden: ID ↑</option>
+          </select>
+          <button id="btnExportCSV" class="bg-purple-700 hover:bg-purple-800 text-white px-3 py-2 rounded-lg"><i class="fa-solid fa-file-export mr-2"></i>Exportar CSV</button>
+          <button id="btnExportXLSX" class="bg-purple-700 hover:bg-purple-800 text-white px-3 py-2 rounded-lg"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</button>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow-md overflow-hidden">
+        <div class="p-6 bg-purple-700 text-white">
+          <h3 class="text-xl font-semibold"><i class="fas fa-cog mr-2"></i>Reportes</h3>
+        </div>
+        <div id="adminReportsList" class="p-6 space-y-4"></div>
+        <div class="flex items-center justify-between p-4 border-t bg-purple-50">
+          <button id="adminPrev" class="px-3 py-2 bg-white border rounded hover:bg-purple-100">Anterior</button>
+          <div class="text-sm">Página <span id="adminPage">1</span> de <span id="adminTotalPages">1</span></div>
+          <button id="adminNext" class="px-3 py-2 bg-white border rounded hover:bg-purple-100">Siguiente</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Simulación de Email -->
+    <div id="emailSimulation" class="fixed top-4 right-4 bg-white rounded-lg shadow-xl p-4 max-w-sm hidden">
+      <div class="flex justify-between items-start mb-3">
+        <h4 class="font-semibold text-gray-800"><i class="fas fa-envelope mr-2"></i>Nuevo Correo</h4>
+        <button onclick="closeEmail()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+      </div>
+      <div id="emailContent" class="text-sm text-gray-600"></div>
+    </div>
+
+    <!-- Modal decisión (admin) -->
+    <div id="decisionModal" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50">
+      <div class="bg-white rounded-xl p-5 w-full max-w-lg">
+        <div class="flex justify-between items-center mb-3">
+          <h4 class="text-lg font-semibold" id="decisionTitle">Procesar Reporte</h4>
+          <button onclick="closeDecisionModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+        </div>
+        <p class="text-sm text-gray-600 mb-3" id="decisionInfo"></p>
+        <textarea id="decisionComment" rows="4" placeholder="Comentario (opcional)" class="w-full border rounded-lg p-3 mb-4"></textarea>
+        <div class="flex justify-end gap-2">
+          <button onclick="closeDecisionModal()" class="px-4 py-2 rounded border">Cancelar</button>
+          <button id="decisionConfirmBtn" class="px-4 py-2 rounded bg-purple-600 text-white">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-purple-800 text-white py-8">
+    <div class="container mx-auto px-4 text-center">
+      <p>&copy; 2024 Sistema de Control de Calidad. Todos los derechos reservados.</p>
+    </div>
+  </footer>
+
+  <script>
+    // ====== Estado global ======
+    const ADMIN_EMAILS = ["omar_casanga@bat.com", "j.dalzotto@usal.edu.ar"];
+    let reports = JSON.parse(localStorage.getItem('qualityReports')) || [];
+    let isAdmin = false;
+    let currentUser = 'usuario@empresa.com';
+
+    // Catálogo: { codigoNormalizado: { material, proveedor, rawCodigo } }
+    let materialCatalog = JSON.parse(localStorage.getItem('materialCatalogV2') || '{}');
+
+    // Normalizador robusto de códigos (mismo para carga e input)
+    function normalizeCode(v) {
+      let s = String(v ?? '').trim();
+      // quitar espacios internos y separadores comunes
+      s = s.replace(/\s+/g, '');
+      s = s.replace(/[-_.]/g, '');
+      // si es número con .0, quitar decimales .0, .00, etc
+      if (/^\d+(\.0+)?$/.test(s)) s = s.replace(/\.0+$/, '');
+      // pasar a mayúsculas (por si hay letras)
+      s = s.toUpperCase();
+      return s;
+    }
+
+    function setCatalogCount() {
+      const el = document.getElementById('catalogCount');
+      if (el) el.textContent = Object.keys(materialCatalog).length;
+    }
+
+    // Intentar cargar catálogo desde JSON (requiere servir por http, no file://)
+    async function cargarCatalogoJSON() {
+      try {
+        const res = await fetch('catalogo_materiales.json');
+        if (!res.ok) return; // si no está, ignorar
+        const data = await res.json();
+        const cat = {};
+        for (const r of data) {
+          const code = normalizeCode(r.codigoMaterial);
+          if (!code) continue;
+          cat[code] = { material: String(r.material||'').trim(), proveedor: String(r.proveedor||'').trim(), rawCodigo: String(r.codigoMaterial||'').trim() };
+        }
+        materialCatalog = cat;
+        localStorage.setItem('materialCatalogV2', JSON.stringify(materialCatalog));
+        setCatalogCount();
+      } catch (e) {
+        console.warn('No se pudo cargar catalogo_materiales.json. Si abriste el HTML con doble clic (file://), el navegador bloquea fetch.', e);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', async function() {
+      setCatalogCount();
+      await cargarCatalogoJSON();
+      loadReports();
+      setupEventListeners();
+
+      // Importar catálogo (opcional)
+      const fileInput = document.getElementById('catalogFile');
+      if (fileInput) {
+        fileInput.addEventListener('change', async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          try {
+            await loadMaterialCatalog(file);
+            alert('Catálogo importado correctamente.');
+          } catch (err) {
+            console.error(err);
+            alert('No se pudo leer el archivo. Verificá el formato/columnas.');
+          } finally {
+            e.target.value = '';
+          }
+        });
+      }
+
+      // Autocompletar material/proveedor por código
+      const codigoInput = document.getElementById('codigoMaterial');
+      codigoInput?.addEventListener('change', applyCatalogToForm);
+      codigoInput?.addEventListener('blur', applyCatalogToForm);
+    });
+
+    function setupEventListeners() {
+      document.getElementById('defectForm').addEventListener('submit', handleFormSubmit);
+      const loginBtnEl = document.getElementById('loginBtn');
+      if(ADMIN_EMAILS.includes((currentUser||'').toLowerCase())){
+        loginBtnEl.addEventListener('click', toggleAdminMode);
+        loginBtnEl.style.display='inline-block';
+      } else {
+        loginBtnEl.style.display='none';
+      }
+
+      // Controles admin básicos (omitidos por brevedad si no cambian)
+      const s = id => document.getElementById(id);
+      s('adminSearch')?.addEventListener('input', (e) => { /* ... */ });
+      s('btnExportCSV')?.addEventListener('click', exportAdminCSV);
+      s('btnExportXLSX')?.addEventListener('click', exportAdminXLSX);
+    }
+
+    // ====== Formulario: envío ======
+    function handleFormSubmit(e) {
+      e.preventDefault();
+
+      const codigoRaw = document.getElementById('codigoMaterial').value;
+      const codigo = normalizeCode(codigoRaw);
+      const info = materialCatalog[codigo];
+      const error = document.getElementById('codigoError');
+
+      if (!info) {
+        error.classList.remove('hidden');
+        return;
+      } else {
+        error.classList.add('hidden');
+      }
+
+      const newReport = {
+        id: Date.now(),
+        fecha: document.getElementById('fecha').value,
+        sector: document.getElementById('sector').value,
+        lote: document.getElementById('lote').value,
+        codigoMaterial: info.rawCodigo || codigoRaw,
+        material: info.material,
+        proveedor: info.proveedor,
+        defecto: document.getElementById('defecto').value,
+        descripcion: document.getElementById('descripcion').value,
+        estado: 'en análisis',
+        fechaCreacion: new Date().toISOString(),
+        usuario: currentUser,
+        administrador: null,
+        decision: null,
+        fechaDecision: null,
+        comentario: ''
+      };
+
+      reports.push(newReport);
+      saveReports();
+
+      simulateEmail(
+        currentUser,
+        'Confirmación de Reporte de Defecto',
+        `Su reporte ha sido registrado.\n\n` +
+        `Código: ${newReport.codigoMaterial}\nMaterial: ${newReport.material}\nProveedor: ${newReport.proveedor}\n` +
+        `Lote: ${newReport.lote}\nDefecto: ${newReport.defecto}\nEstado: ${newReport.estado}\n\n` +
+        `N° seguimiento: #${newReport.id}`
+      );
+
+      document.getElementById('defectForm').reset();
+      document.getElementById('materialAuto').value = '';
+      document.getElementById('proveedorAuto').value = '';
+      alert('¡Reporte enviado exitosamente!');
+      if (!isAdmin) showMyReports();
+    }
+
+    // ====== Autocompletar material/proveedor ======
+    function applyCatalogToForm() {
+      const codeInput = document.getElementById('codigoMaterial');
+      const code = normalizeCode(codeInput?.value || '');
+      const info = materialCatalog[code];
+      const error = document.getElementById('codigoError');
+      const mat = document.getElementById('materialAuto');
+      const prov = document.getElementById('proveedorAuto');
+
+      if (!info) {
+        mat.value = '';
+        prov.value = '';
+        error.classList.remove('hidden');
+        return;
+      }
+      error.classList.add('hidden');
+      mat.value = info.material || '';
+      prov.value = info.proveedor || '';
+    }
+
+    // ====== Cargar catálogo desde archivo (CSV/XLSX) ======
+    async function loadMaterialCatalog(file) {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, { type: 'array' });
+      const sheetName = wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+      const normHead = s => String(s||'').trim().toLowerCase().replace('código','codigo').replace(/\s|\.|-/g,'');
+      const first = rows[0] || {};
+      const headersMap = {};
+      Object.keys(first).forEach(k => headersMap[normHead(k)] = k);
+
+      const need = {
+        codigomaterial: headersMap['codigomaterial'] || headersMap['codigo'] || headersMap['codigoarticulo'] || Object.keys(first)[0],
+        material: headersMap['material'] || headersMap['producto'] || headersMap['descripcion'] || Object.keys(first)[1],
+        proveedor: headersMap['proveedor'] || headersMap['supplier'] || headersMap['vendor'] || Object.keys(first)[2]
+      };
+
+      const cat = {};
+      rows.forEach(r => {
+        const raw = r[need.codigomaterial];
+        const code = normalizeCode(raw);
+        if (!code) return;
+        cat[code] = {
+          material: String(r[need.material] ?? '').trim(),
+          proveedor: String(r[need.proveedor] ?? '').trim(),
+          rawCodigo: String(raw ?? '').trim()
+        };
+      });
+
+      materialCatalog = cat;
+      localStorage.setItem('materialCatalogV2', JSON.stringify(materialCatalog));
+      setCatalogCount();
+      console.log('Catálogo cargado:', materialCatalog);
+    }
+
+    // ====== Listados usuario/admin simplificados (omito detalles de admin para foco en problema) ======
+    function loadReports() { isAdmin ? displayAdminReports() : displayUserReports(); }
+
+    function displayUserReports() {
+      const reportsList = document.getElementById('reportsList');
+      const userReports = reports.filter(r => r.usuario === currentUser);
+      if (userReports.length === 0) {
+        reportsList.innerHTML = `
+          <div class=\"text-center py-12 bg-white rounded-lg\">\n            <i class=\"fas fa-clipboard-list text-4xl text-gray-300 mb-4\"></i>\n            <p class=\"text-gray-500\">No hay reportes registrados</p>\n          </div>`;
+        return;
+      }
+      reportsList.innerHTML = userReports.map(report => `
+        <div class=\"bg-white rounded-lg shadow-md p-6 card-hover transition-all\">\n          <div class=\"flex justify-between items-start mb-4\">\n            <div>\n              <h3 class=\"text-lg font-semibold text-gray-800\">${report.material} <span class=\"text-gray-400\">#${report.id}</span></h3>\n              <p class=\"text-sm text-gray-600\">Proveedor: ${report.proveedor} • Código: ${report.codigoMaterial}</p>\n            </div>\n            <span class=\"px-3 py-1 rounded-full text-sm font-medium ${getStatusClass(report.estado)}\">${report.estado}</span>\n          </div>\n          <div class=\"grid grid-cols-2 gap-4 mb-4 text-sm\">\n            <div>\n              <p class=\"text-gray-600\">Sector: ${report.sector}</p>\n              <p class=\"text-gray-600\">Defecto: ${report.defecto}</p>\n            </div>\n            <div>\n              <p class=\"text-gray-600\">Fecha: ${formatDate(report.fecha)}</p>\n              <p class=\"text-gray-600\">Lote: ${report.lote}</p>\n            </div>\n          </div>\n          <p class=\"text-gray-700 mb-4\">${report.descripcion}</p>\n        </div>`).join('');
+    }
+
+    // ====== Admin placeholders ======
+    function displayAdminReports(){
+      const adminList = document.getElementById('adminReportsList');
+      if (!adminList) return;
+      adminList.innerHTML = reports.map(r => `<div class='p-4 bg-white rounded border'><b>#${r.id}</b> • ${r.material} • ${r.proveedor} • ${r.codigoMaterial}</div>`).join('');
+    }
+
+    // ====== Utilidades ======
+    function simulateEmail(to, subject, content) {
+      const emailDiv = document.getElementById('emailSimulation');
+      document.getElementById('emailContent').innerHTML = `<p><strong>Para:</strong> ${to}</p><p><strong>Asunto:</strong> ${subject}</p><div class=\"mt-3 p-3 bg-gray-50 rounded\">${content.replace(/\n/g, '<br>')}</div>`;
+      emailDiv.classList.remove('hidden');
+    }
+    function closeEmail() { document.getElementById('emailSimulation').classList.add('hidden'); }
+    function getStatusClass(status) {
+      switch(status) {
+        case 'en análisis': return 'status-pending';
+        case 'reclamos': return 'status-approved';
+        case 'rechazo': return 'status-rejected';
+        case 'no válido': return 'status-invalid';
+        default: return 'status-pending';
+      }
+    }
+    function formatDate(dateString) { try { return new Date(dateString).toLocaleDateString('es-ES'); } catch { return '-'; } }
+    function saveReports() { localStorage.setItem('qualityReports', JSON.stringify(reports)); }
+
+    // Exportar CSV/Excel (placeholders)
+    function exportAdminCSV() {}
+    function exportAdminXLSX() {}
+  </script>
+</body>
+</html>
