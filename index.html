@@ -11,10 +11,10 @@
   <style>
     .transition-all { transition: all 0.3s ease; }
     .card-hover:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
-    .status-pending { background-color: #ede9fe; color: #7c3aed; }
+    .status-pending  { background-color: #ede9fe; color: #7c3aed; }
     .status-approved { background-color: #e0e7ff; color: #4338ca; }
     .status-rejected { background-color: #f3e8ff; color: #a855f7; }
-    .status-invalid { background-color: #f5f3ff; color: #6d28d9; }
+    .status-invalid  { background-color: #f5f3ff; color: #6d28d9; }
   </style>
 </head>
 <body class="bg-purple-50 min-h-screen">
@@ -26,9 +26,19 @@
           <img src="iws.jpg" alt="Logo IWS" class="h-10">
           <h1 class="text-2xl font-bold">Sistema de Control de Calidad</h1>
         </div>
-        <button id="loginBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-all">
-          <i class="fas fa-user mr-2"></i>Ingresar como Administrador
-        </button>
+
+        <!-- Login simple + botón Admin -->
+        <div class="flex items-center gap-2">
+          <input type="email" id="userEmail" placeholder="Ingresá tu correo"
+                 class="px-2 py-1 rounded text-black text-sm">
+          <button id="loginUserBtn" class="bg-white text-purple-700 px-2 py-1 rounded text-sm">Ingresar</button>
+          <button id="logoutUserBtn" class="hidden bg-white text-purple-700 px-2 py-1 rounded text-sm">Salir</button>
+
+          <!-- Botón Admin (se muestra solo si el mail está en ADMIN_EMAILS) -->
+          <button id="loginBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-all">
+            <i class="fas fa-user mr-2"></i>Ingresar como Administrador
+          </button>
+        </div>
       </div>
     </div>
   </header>
@@ -163,44 +173,12 @@
       <div id="reportsList" class="grid grid-cols-1 gap-6"></div>
     </section>
 
-    <!-- Panel de Administración (igual que antes, omitido por brevedad) -->
+    <!-- Panel de Administración -->
     <section id="adminSection" class="mb-12" style="display: none;">
       <div class="text-center mb-8">
         <h2 class="text-3xl font-bold text-gray-800 mb-2">Panel de Administración</h2>
         <p class="text-gray-600">Gestión de todos los reportes de defectos del sistema.</p>
         <p class="mt-2 text-sm">Pendientes: <span id="badgePendientes" class="font-semibold text-purple-700">0</span></p>
-      </div>
-      <div class="bg-white rounded-xl shadow-md p-4 mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <input id="adminSearch" type="text" placeholder="Buscar por código, material, descripción, lote o ID..."
-               class="px-3 py-2 border rounded-lg w-full focus:ring-2 focus:ring-purple-500">
-        <select id="adminFilterEstado" class="px-3 py-2 border rounded-lg w-full focus:ring-2 focus:ring-purple-500">
-          <option value="">Estado: Todos</option>
-          <option value="en análisis">En análisis</option>
-          <option value="reclamos">Reclamos</option>
-          <option value="rechazo">Rechazo</option>
-          <option value="no válido">No válido</option>
-        </select>
-        <select id="adminFilterProveedor" class="px-3 py-2 border rounded-lg w-full focus:ring-2 focus:ring-purple-500">
-          <option value="">Proveedor: Todos</option>
-          <option>AMCOR</option><option>CERDIA</option><option>INNOVIA</option><option>IPC</option>
-        </select>
-        <select id="adminFilterSector" class="px-3 py-2 border rounded-lg w-full focus:ring-2 focus:ring-purple-500">
-          <option value="">Sector: Todos</option>
-          <option>KDF 2</option><option>KDF 3</option><option>KDF 4</option><option>KDF 5</option>
-          <option>M15</option><option>M16</option><option>M17</option><option>M18</option>
-          <option>M28</option><option>M29</option><option>M59</option><option>M39</option>
-          <option>LOGISTICA</option><option>PMD</option>
-        </select>
-        <div class="md:col-span-4 flex gap-2 flex-wrap">
-          <select id="adminSort" class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
-            <option value="fechaDesc">Orden: Fecha ↓</option>
-            <option value="fechaAsc">Orden: Fecha ↑</option>
-            <option value="idDesc">Orden: ID ↓</option>
-            <option value="idAsc">Orden: ID ↑</option>
-          </select>
-          <button id="btnExportCSV" class="bg-purple-700 hover:bg-purple-800 text-white px-3 py-2 rounded-lg"><i class="fa-solid fa-file-export mr-2"></i>Exportar CSV</button>
-          <button id="btnExportXLSX" class="bg-purple-700 hover:bg-purple-800 text-white px-3 py-2 rounded-lg"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</button>
-        </div>
       </div>
       <div class="bg-white rounded-xl shadow-md overflow-hidden">
         <div class="p-6 bg-purple-700 text-white">
@@ -252,22 +230,56 @@
     const ADMIN_EMAILS = ["omar_casanga@bat.com", "j.dalzotto@usal.edu.ar"];
     let reports = JSON.parse(localStorage.getItem('qualityReports')) || [];
     let isAdmin = false;
-    let currentUser = 'usuario@empresa.com';
+    let currentUser = localStorage.getItem('currentUser') || '';
 
     // Catálogo: { codigoNormalizado: { material, proveedor, rawCodigo } }
     let materialCatalog = JSON.parse(localStorage.getItem('materialCatalogV2') || '{}');
 
-    // Normalizador robusto de códigos (mismo para carga e input)
+    // ===== Auth simple por email =====
+    function userIsAdmin() {
+      return ADMIN_EMAILS.map(e => e.toLowerCase()).includes((currentUser || '').toLowerCase());
+    }
+    function updateAuthUI() {
+      const emailInput    = document.getElementById('userEmail');
+      const adminBtn      = document.getElementById('loginBtn');
+      const loginUserBtn  = document.getElementById('loginUserBtn');
+      const logoutUserBtn = document.getElementById('logoutUserBtn');
+
+      if (emailInput) emailInput.value = currentUser || '';
+
+      // Botón Admin visible solo si es admin
+      adminBtn.style.display = userIsAdmin() ? 'inline-block' : 'none';
+
+      // Ingresar/Salir según sesión
+      if (currentUser) {
+        loginUserBtn.classList.add('hidden');
+        logoutUserBtn.classList.remove('hidden');
+      } else {
+        loginUserBtn.classList.remove('hidden');
+        logoutUserBtn.classList.add('hidden');
+      }
+    }
+    function loginUser() {
+      const email = (document.getElementById('userEmail')?.value || '').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { alert('Ingresá un correo válido'); return; }
+      currentUser = email;
+      localStorage.setItem('currentUser', currentUser);
+      updateAuthUI();
+      alert(`Sesión iniciada como: ${currentUser}`);
+    }
+    function logoutUser() {
+      localStorage.removeItem('currentUser');
+      currentUser = '';
+      updateAuthUI();
+    }
+
+    // Normalizador de códigos
     function normalizeCode(v) {
       let s = String(v ?? '').trim();
-      // quitar espacios internos y separadores comunes
       s = s.replace(/\s+/g, '');
       s = s.replace(/[-_.]/g, '');
-      // si es número con .0, quitar decimales .0, .00, etc
       if (/^\d+(\.0+)?$/.test(s)) s = s.replace(/\.0+$/, '');
-      // pasar a mayúsculas (por si hay letras)
-      s = s.toUpperCase();
-      return s;
+      return s.toUpperCase();
     }
 
     function setCatalogCount() {
@@ -323,19 +335,24 @@
       const codigoInput = document.getElementById('codigoMaterial');
       codigoInput?.addEventListener('change', applyCatalogToForm);
       codigoInput?.addEventListener('blur', applyCatalogToForm);
+
+      // Login simple
+      document.getElementById('loginUserBtn')?.addEventListener('click', loginUser);
+      document.getElementById('logoutUserBtn')?.addEventListener('click', logoutUser);
+
+      // Botón admin: chequear permisos antes de alternar panel
+      document.getElementById('loginBtn')?.addEventListener('click', () => {
+        if (!userIsAdmin()) { alert('No tenés permisos de administrador.'); return; }
+        toggleAdminMode();
+      });
+
+      updateAuthUI();
     });
 
     function setupEventListeners() {
       document.getElementById('defectForm').addEventListener('submit', handleFormSubmit);
-      const loginBtnEl = document.getElementById('loginBtn');
-      if(ADMIN_EMAILS.includes((currentUser||'').toLowerCase())){
-        loginBtnEl.addEventListener('click', toggleAdminMode);
-        loginBtnEl.style.display='inline-block';
-      } else {
-        loginBtnEl.style.display='none';
-      }
 
-      // Controles admin básicos (omitidos por brevedad si no cambian)
+      // Controles admin (si los usás más adelante)
       const s = id => document.getElementById(id);
       s('adminSearch')?.addEventListener('input', (e) => { /* ... */ });
       s('btnExportCSV')?.addEventListener('click', exportAdminCSV);
@@ -345,6 +362,11 @@
     // ====== Formulario: envío ======
     function handleFormSubmit(e) {
       e.preventDefault();
+
+      if (!currentUser) {
+        alert('Debés iniciar sesión (ingresar tu correo) antes de cargar un reporte.');
+        return;
+      }
 
       const codigoRaw = document.getElementById('codigoMaterial').value;
       const codigo = normalizeCode(codigoRaw);
@@ -398,8 +420,7 @@
 
     // ====== Autocompletar material/proveedor ======
     function applyCatalogToForm() {
-      const codeInput = document.getElementById('codigoMaterial');
-      const code = normalizeCode(codeInput?.value || '');
+      const code = normalizeCode(document.getElementById('codigoMaterial')?.value || '');
       const info = materialCatalog[code];
       const error = document.getElementById('codigoError');
       const mat = document.getElementById('materialAuto');
@@ -453,7 +474,7 @@
       console.log('Catálogo cargado:', materialCatalog);
     }
 
-    // ====== Listados usuario/admin simplificados (omito detalles de admin para foco en problema) ======
+    // ====== Listados usuario/admin simplificados ======
     function loadReports() { isAdmin ? displayAdminReports() : displayUserReports(); }
 
     function displayUserReports() {
@@ -461,34 +482,75 @@
       const userReports = reports.filter(r => r.usuario === currentUser);
       if (userReports.length === 0) {
         reportsList.innerHTML = `
-          <div class=\"text-center py-12 bg-white rounded-lg\">\n            <i class=\"fas fa-clipboard-list text-4xl text-gray-300 mb-4\"></i>\n            <p class=\"text-gray-500\">No hay reportes registrados</p>\n          </div>`;
+          <div class="text-center py-12 bg-white rounded-lg">
+            <i class="fas fa-clipboard-list text-4xl text-gray-300 mb-4"></i>
+            <p class="text-gray-500">No hay reportes registrados</p>
+          </div>`;
         return;
       }
       reportsList.innerHTML = userReports.map(report => `
-        <div class=\"bg-white rounded-lg shadow-md p-6 card-hover transition-all\">\n          <div class=\"flex justify-between items-start mb-4\">\n            <div>\n              <h3 class=\"text-lg font-semibold text-gray-800\">${report.material} <span class=\"text-gray-400\">#${report.id}</span></h3>\n              <p class=\"text-sm text-gray-600\">Proveedor: ${report.proveedor} • Código: ${report.codigoMaterial}</p>\n            </div>\n            <span class=\"px-3 py-1 rounded-full text-sm font-medium ${getStatusClass(report.estado)}\">${report.estado}</span>\n          </div>\n          <div class=\"grid grid-cols-2 gap-4 mb-4 text-sm\">\n            <div>\n              <p class=\"text-gray-600\">Sector: ${report.sector}</p>\n              <p class=\"text-gray-600\">Defecto: ${report.defecto}</p>\n            </div>\n            <div>\n              <p class=\"text-gray-600\">Fecha: ${formatDate(report.fecha)}</p>\n              <p class=\"text-gray-600\">Lote: ${report.lote}</p>\n            </div>\n          </div>\n          <p class=\"text-gray-700 mb-4\">${report.descripcion}</p>\n        </div>`).join('');
+        <div class="bg-white rounded-lg shadow-md p-6 card-hover transition-all">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h3 class="text-lg font-semibold text-gray-800">${report.material} <span class="text-gray-400">#${report.id}</span></h3>
+              <p class="text-sm text-gray-600">Proveedor: ${report.proveedor} • Código: ${report.codigoMaterial}</p>
+            </div>
+            <span class="px-3 py-1 rounded-full text-sm font-medium ${getStatusClass(report.estado)}">${report.estado}</span>
+          </div>
+          <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+            <div>
+              <p class="text-gray-600">Sector: ${report.sector}</p>
+              <p class="text-gray-600">Defecto: ${report.defecto}</p>
+            </div>
+            <div>
+              <p class="text-gray-600">Fecha: ${formatDate(report.fecha)}</p>
+              <p class="text-gray-600">Lote: ${report.lote}</p>
+            </div>
+          </div>
+          <p class="text-gray-700 mb-4">${report.descripcion}</p>
+        </div>`).join('');
     }
 
-    // ====== Admin placeholders ======
     function displayAdminReports(){
       const adminList = document.getElementById('adminReportsList');
       if (!adminList) return;
       adminList.innerHTML = reports.map(r => `<div class='p-4 bg-white rounded border'><b>#${r.id}</b> • ${r.material} • ${r.proveedor} • ${r.codigoMaterial}</div>`).join('');
     }
 
+    // Alternar panel admin (con chequeo de permisos)
+    function toggleAdminMode() {
+      if (!userIsAdmin()) { alert('No tenés permisos de administrador.'); return; }
+      isAdmin = !isAdmin;
+      if (isAdmin) {
+        document.getElementById('mainSection').style.display = 'none';
+        document.getElementById('myReportsSection').style.display = 'none';
+        document.getElementById('adminSection').style.display = 'block';
+        displayAdminReports();
+      } else {
+        document.getElementById('mainSection').style.display = 'block';
+        document.getElementById('myReportsSection').style.display = 'block';
+        document.getElementById('adminSection').style.display = 'none';
+        displayUserReports();
+      }
+    }
+
     // ====== Utilidades ======
     function simulateEmail(to, subject, content) {
       const emailDiv = document.getElementById('emailSimulation');
-      document.getElementById('emailContent').innerHTML = `<p><strong>Para:</strong> ${to}</p><p><strong>Asunto:</strong> ${subject}</p><div class=\"mt-3 p-3 bg-gray-50 rounded\">${content.replace(/\n/g, '<br>')}</div>`;
+      document.getElementById('emailContent').innerHTML =
+        `<p><strong>Para:</strong> ${to}</p>
+         <p><strong>Asunto:</strong> ${subject}</p>
+         <div class="mt-3 p-3 bg-gray-50 rounded">${content.replace(/\n/g, '<br>')}</div>`;
       emailDiv.classList.remove('hidden');
     }
     function closeEmail() { document.getElementById('emailSimulation').classList.add('hidden'); }
     function getStatusClass(status) {
       switch(status) {
         case 'en análisis': return 'status-pending';
-        case 'reclamos': return 'status-approved';
-        case 'rechazo': return 'status-rejected';
-        case 'no válido': return 'status-invalid';
-        default: return 'status-pending';
+        case 'reclamos':   return 'status-approved';
+        case 'rechazo':    return 'status-rejected';
+        case 'no válido':  return 'status-invalid';
+        default:           return 'status-pending';
       }
     }
     function formatDate(dateString) { try { return new Date(dateString).toLocaleDateString('es-ES'); } catch { return '-'; } }
@@ -500,3 +562,4 @@
   </script>
 </body>
 </html>
+
